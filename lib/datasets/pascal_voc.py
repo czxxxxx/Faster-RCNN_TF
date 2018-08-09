@@ -84,6 +84,7 @@ class pascal_voc(imdb):
         assert os.path.exists(image_set_file), \
                 'Path does not exist: {}'.format(image_set_file)
         with open(image_set_file) as f:
+            # strip去除首尾某个字符，不填为去除空格
             image_index = [x.strip() for x in f.readlines()]
         return image_index
 
@@ -93,6 +94,7 @@ class pascal_voc(imdb):
         """
         return os.path.join(cfg.DATA_DIR, 'VOCdevkit' + self._year)
 
+    #获取包含有每个image的ground truth的roi信息与分类信息等
     def gt_roidb(self):
         """
         Return the database of ground-truth regions of interest.
@@ -100,14 +102,19 @@ class pascal_voc(imdb):
         This function loads/saves from/to a cache file to speed up future calls.
         """
         cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
+
+        #若存在缓存文件，直接从缓存中读取
         if os.path.exists(cache_file):
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
             print '{} gt roidb loaded from {}'.format(self.name, cache_file)
             return roidb
 
+        #不存在缓存文件，从annotation重新构建roidb，gt_roidb包含每个图片的ground truth roi信息
         gt_roidb = [self._load_pascal_annotation(index)
                     for index in self.image_index]
+
+        #将roidb写入缓存文件
         with open(cache_file, 'wb') as fid:
             cPickle.dump(gt_roidb, fid, cPickle.HIGHEST_PROTOCOL)
         print 'wrote gt roidb to {}'.format(cache_file)
@@ -180,6 +187,12 @@ class pascal_voc(imdb):
 
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
+    # annotation包含图片的boundingBox、分类等各项信息，返回值为
+    # return {'boxes': boxes,
+    #         'gt_classes': gt_classes,
+    #         'gt_overlaps': overlaps,
+    #         'flipped': False,
+    #         'seg_areas': seg_areas}
     def _load_pascal_annotation(self, index):
         """
         Load image and bounding boxes info from XML file in the PASCAL VOC
@@ -187,7 +200,10 @@ class pascal_voc(imdb):
         """
         filename = os.path.join(self._data_path, 'Annotations', index + '.xml')
         tree = ET.parse(filename)
+        #findall找到xml文件中所有的<object>元素，其中含有分类和BoundingBox信息
         objs = tree.findall('object')
+
+        #排除难度系数为1的object
         if not self.config['use_diff']:
             # Exclude the samples labeled as difficult
             non_diff_objs = [
@@ -204,6 +220,8 @@ class pascal_voc(imdb):
         # "Seg" area for pascal is just the box area
         seg_areas = np.zeros((num_objs), dtype=np.float32)
 
+
+        # 将object的boundingBox信息载入到数据格式中
         # Load object bounding boxes into a data frame.
         for ix, obj in enumerate(objs):
             bbox = obj.find('bndbox')
@@ -212,12 +230,15 @@ class pascal_voc(imdb):
             y1 = float(bbox.find('ymin').text) - 1
             x2 = float(bbox.find('xmax').text) - 1
             y2 = float(bbox.find('ymax').text) - 1
+
+            # 将string的分类信息转化为数字
             cls = self._class_to_ind[obj.find('name').text.lower().strip()]
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = cls
             overlaps[ix, cls] = 1.0
             seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
 
+        # 系数矩阵的压缩存储
         overlaps = scipy.sparse.csr_matrix(overlaps)
 
         return {'boxes' : boxes,

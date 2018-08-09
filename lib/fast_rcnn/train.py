@@ -15,6 +15,7 @@ from utils.timer import Timer
 import numpy as np
 import os
 import tensorflow as tf
+from gt_data_layer.layer import GtDataLayer
 import sys
 from tensorflow.python.client import timeline
 import time

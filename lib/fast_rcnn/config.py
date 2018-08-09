@@ -23,9 +23,13 @@ from distutils import spawn
 # `pip install easydict` if you don't have it
 from easydict import EasyDict as edict
 
+# 字典存储神经网络的默认配置信息
+# you should write a config file (in yaml)
+# and use cfg_from_file(yaml_file) to load it and override the default options.
+
 __C = edict()
 # Consumers can get config by:
-#   from fast_rcnn_config import cfg
+#   from fast_rcnn.config import cfg
 cfg = __C
 
 #
@@ -255,6 +259,9 @@ def get_output_dir(imdb, weights_filename):
         os.makedirs(outdir)
     return outdir
 
+
+# 将配置文件a的配置覆盖到配置文件b中
+
 def _merge_a_into_b(a, b):
     """Merge config dictionary a into config dictionary b, clobbering the
     options in b whenever they are also specified in a.
@@ -299,9 +306,24 @@ def cfg_from_list(cfg_list):
     """Set config keys via list (e.g., from command line)."""
     from ast import literal_eval
     assert len(cfg_list) % 2 == 0
+    # >>> a = [1, 2, 3, 4, 5, 6]
+    # >>> a[0::2]
+    # [1, 3, 5]
+    # >>> a[1::2]
+    # [2, 4, 6]
+    # 从index为0的位置开始，以步长为2进行遍历
+    # 第一个“a:b”表示“index从a到b”，第二个“:c”表示为步长c
+    # >>> a = '0123456'
+    # >>> a[1:5]
+    # '1234'
+    # 返回结果是1234，第一位到第五位切片（初始是0位）
+    # >>> a[1:5:2]
+    # '13'
+    # 1 - 5位切片，步进为2，所以取出来是‘13’
     for k, v in zip(cfg_list[0::2], cfg_list[1::2]):
         key_list = k.split('.')
         d = __C
+        # -1表示最后一位所代表的index,[:-1]表示除了最后一位剩下的元素
         for subkey in key_list[:-1]:
             assert d.has_key(subkey)
             d = d[subkey]

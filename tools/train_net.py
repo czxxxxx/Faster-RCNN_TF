@@ -20,6 +20,7 @@ import numpy as np
 import sys
 import pdb
 
+
 def parse_args():
     """
     Parse input arguments
@@ -75,9 +76,13 @@ if __name__ == '__main__':
     print('Using config:')
     pprint.pprint(cfg)
 
+
+    # 固定随机种子，以便重现
     if not args.randomize:
         # fix the random seeds (numpy and caffe) for reproducibility
         np.random.seed(cfg.RNG_SEED)
+
+
     imdb = get_imdb(args.imdb_name)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     roidb = get_training_roidb(imdb)
