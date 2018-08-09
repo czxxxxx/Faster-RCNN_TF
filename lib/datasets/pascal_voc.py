@@ -73,6 +73,8 @@ class pascal_voc(imdb):
                 'Path does not exist: {}'.format(image_path)
         return image_path
 
+
+    # 获取image的index列表，例如image文件名为00012.jpg，该方法返回00012.
     def _load_image_set_index(self):
         """
         Load the indexes listed in this dataset's image set file.
@@ -94,7 +96,7 @@ class pascal_voc(imdb):
         """
         return os.path.join(cfg.DATA_DIR, 'VOCdevkit' + self._year)
 
-    #获取包含有每个image的ground truth的roi信息与分类信息等
+    #获取包含有image的ground truth的roi信息与分类信息等
     def gt_roidb(self):
         """
         Return the database of ground-truth regions of interest.
@@ -168,6 +170,7 @@ class pascal_voc(imdb):
             box_list = cPickle.load(f)
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
+    # 返回所有ss框的box坐标和与各个ss框有最大IoU的gt框的分类，[ss框数量,类别数量]
     def _load_selective_search_roidb(self, gt_roidb):
         filename = os.path.abspath(os.path.join(cfg.DATA_DIR,
                                                 'selective_search_data',

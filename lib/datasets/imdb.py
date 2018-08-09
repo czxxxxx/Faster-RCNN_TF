@@ -208,6 +208,13 @@ class imdb(object):
         return {'ar': ar, 'recalls': recalls, 'thresholds': thresholds,
                 'gt_overlaps': gt_overlaps}
 
+
+    # 返回值为：
+    # 'boxes': boxes,
+    # 'gt_classes': np.zeros((num_boxes,), dtype=np.int32),
+    # 'gt_overlaps': overlaps,
+    # 'flipped': False,
+    # 'seg_areas': np.zeros((num_boxes,), dtype=np.float32),
     def create_roidb_from_box_list(self, box_list, gt_roidb):
         assert len(box_list) == self.num_images, \
                 'Number of boxes must match number of ground-truth images'
@@ -215,16 +222,29 @@ class imdb(object):
         for i in xrange(self.num_images):
             boxes = box_list[i]
             num_boxes = boxes.shape[0]
+
+            # 记录每个ss框所属的分类以及它的IoU——分别计算某一个ss框与每一个gt框的IoU，IoU最大的那个gt框所代表的的分类即为该ss框的分类，overlaps[x,y]的值为IoU
             overlaps = np.zeros((num_boxes, self.num_classes), dtype=np.float32)
 
             if gt_roidb is not None and gt_roidb[i]['boxes'].size > 0:
                 gt_boxes = gt_roidb[i]['boxes']
                 gt_classes = gt_roidb[i]['gt_classes']
+
+                # boxes: (N, 4) ndarray of float
+                # gt_boxes: (K, 4) ndarray of float
+                # gt_overlaps: (N, K) ndarray of overlap between boxes and gt_boxes
+                # gt_overlaps(n,k)表示第n个ss建议框和第k个ground truth框的IoU
                 gt_overlaps = bbox_overlaps(boxes.astype(np.float),
                                             gt_boxes.astype(np.float))
+
+                # 获得和ss框IoU最大的gt框的index，[1,N]
                 argmaxes = gt_overlaps.argmax(axis=1)
+                # 获得各个ss框与gt框IoU值中的最大值，[1,N]
                 maxes = gt_overlaps.max(axis=1)
+                # 选出IoU最大值大于0的ss框的index，即选出与gt框相交的ss框
                 I = np.where(maxes > 0)[0]
+
+                # 记录与gt框有相交的所有ss框所属的分类与IoU值，argmaxes[I]表示与第i个ss框有最大IoU的gt框的index，gt_classes[argmaxes[I]]获得该gt框的种类
                 overlaps[I, gt_classes[argmaxes[I]]] = maxes[I]
 
             overlaps = scipy.sparse.csr_matrix(overlaps)
