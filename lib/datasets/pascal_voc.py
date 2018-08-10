@@ -20,7 +20,9 @@ from voc_eval import voc_eval
 from fast_rcnn.config import cfg
 import pdb
 
-
+# 使用_one_underline来表示该方法或属性是私有的，不属于API；
+# 当创建一个用于python调用或一些特殊情况时，使用__two_underline__；
+# 使用__just_to_underlines，来避免子类的重写！
 class pascal_voc(imdb):
     def __init__(self, image_set, year, devkit_path=None):
         imdb.__init__(self, 'voc_' + year + '_' + image_set)
@@ -123,6 +125,11 @@ class pascal_voc(imdb):
 
         return gt_roidb
 
+
+    # 获取roi框，包括gt和ss框
+    # Fast R-CNN网络微调训练
+    # 正样本：Ground Truth +与Ground Truth相交IoU>阈值的区域建议
+    # 负样本：与Ground Truth相交IoU<阈值的区域建议
     def selective_search_roidb(self):
         """
         Return the database of selective search regions of interest.
@@ -151,6 +158,7 @@ class pascal_voc(imdb):
 
         return roidb
 
+    # 当采用rpn时，获取rpn网络的roi。Fast R-CNN网络微调训练时正负样本同selective_search_roidb，因此需要merge_roidbs。
     def rpn_roidb(self):
         if int(self._year) == 2007 or self._image_set != 'test':
             gt_roidb = self.gt_roidb()
@@ -170,7 +178,7 @@ class pascal_voc(imdb):
             box_list = cPickle.load(f)
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
-    # 返回所有ss框的box坐标和与各个ss框有最大IoU的gt框的分类，[ss框数量,类别数量]
+    # 返回所有ss框的box坐标和与各个ss框有最大IoU的gt框的分类，分类的矩阵形状为[ss框数量,类别数量]
     def _load_selective_search_roidb(self, gt_roidb):
         filename = os.path.abspath(os.path.join(cfg.DATA_DIR,
                                                 'selective_search_data',

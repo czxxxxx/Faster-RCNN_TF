@@ -10,11 +10,20 @@ from rpn_msr.proposal_target_layer_tf import proposal_target_layer as proposal_t
 
 DEFAULT_PADDING = 'SAME'
 
+
+# 装饰器，op为输入函数
+# *args和**kwargs
+# *args就是所有参数的数组
+# **kwargs就是当你传入key=value时存储的字典。
 def layer(op):
+    # 为layer起名（若name为指定时）；验证输入input的合法性；
+    # 存储输出结果到layers并改变input的值为自己的输出，方便后续layer的输入feed（后续层将self.input作为输入）；
     def layer_decorated(self, *args, **kwargs):
         # Automatically set a name if not provided.
+        # 为layer起名
         name = kwargs.setdefault('name', self.get_unique_name(op.__name__))
         # Figure out the layer inputs.
+        # 找到输入input并且验证输入input的合法性
         if len(self.inputs)==0:
             raise RuntimeError('No input variables found for layer %s.'%name)
         elif len(self.inputs)==1:
@@ -22,12 +31,16 @@ def layer(op):
         else:
             layer_input = list(self.inputs)
         # Perform the operation and get the output.
+        # 执行输入的op函数
         layer_output = op(self, layer_input, *args, **kwargs)
-        # Add to layer LUT.
+        # Add to layer LUT.（Look-up table）
+        # 将层输出结果存储
         self.layers[name] = layer_output
         # This output is now the input for the next layer.
+        # 改变self.input的值为layer_out
         self.feed(layer_output)
         # Return self for chained calls.
+        # 返回自身，即调用拥有该装饰器的方法时，都会返回该类（Network）自身
         return self
     return layer_decorated
 
@@ -59,10 +72,14 @@ class Network(object):
 
                                 raise
 
+    # 改变input的值作为输入提供给后面的layer
     def feed(self, *args):
         assert len(args)!=0
+        #input置空
         self.inputs = []
         for layer in args:
+            # 如果参数是已有layer的name（即参数为String），例如“conv1_1”，则从layer表中查询该层，取出该层输出
+            # 如果参数是某一层的输出，直接记录在LUT中
             if isinstance(layer, basestring):
                 try:
                     layer = self.layers[layer]
@@ -70,9 +87,12 @@ class Network(object):
                 except KeyError:
                     print self.layers.keys()
                     raise KeyError('Unknown layer name fed: %s'%layer)
+
+            # 记录该层输出
             self.inputs.append(layer)
         return self
 
+    # 根据层名获取该层输出
     def get_output(self, layer):
         try:
             layer = self.layers[layer]
@@ -91,6 +111,7 @@ class Network(object):
     def validate_padding(self, padding):
         assert padding in ('SAME', 'VALID')
 
+    # group在depth方向上将kernel分成小份（在group个设备上并行训练，因为有一些设备的内存不够？）
     @layer
     def conv(self, input, k_h, k_w, c_o, s_h, s_w, name, relu=True, padding=DEFAULT_PADDING, group=1, trainable=True):
         self.validate_padding(padding)
@@ -100,6 +121,7 @@ class Network(object):
         convolve = lambda i, k: tf.nn.conv2d(i, k, [1, s_h, s_w, 1], padding=padding)
         with tf.variable_scope(name) as scope:
 
+            # 初始化权重（kernel）与偏移量biases
             init_weights = tf.truncated_normal_initializer(0.0, stddev=0.01)
             init_biases = tf.constant_initializer(0.0)
             kernel = self.make_var('weights', [k_h, k_w, c_i/group, c_o], init_weights, trainable)
@@ -112,6 +134,8 @@ class Network(object):
                 kernel_groups = tf.split(3, group, kernel)
                 output_groups = [convolve(i, k) for i,k in zip(input_groups, kernel_groups)]
                 conv = tf.concat(3, output_groups)
+
+            # 是否启用relu
             if relu:
                 bias = tf.nn.bias_add(conv, biases)
                 return tf.nn.relu(bias, name=scope.name)

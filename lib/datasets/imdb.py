@@ -101,6 +101,7 @@ class imdb(object):
       return [PIL.Image.open(self.image_path_at(i)).size[0]
               for i in xrange(self.num_images)]
 
+    # 附加水平翻转的图像到集合中
     def append_flipped_images(self):
         num_images = self.num_images
         widths = self._get_widths()
@@ -257,6 +258,7 @@ class imdb(object):
             })
         return roidb
 
+    # 将ss框与gt框合并
     @staticmethod
     def merge_roidbs(a, b):
         assert len(a) == len(b)
