@@ -5,6 +5,7 @@ from networks.network import Network
 #define
 
 n_classes = 21
+# total stride 各层stride相乘
 _feat_stride = [16,]
 anchor_scales = [8, 16, 32]
 
@@ -13,6 +14,13 @@ class VGGnet_train(Network):
         self.inputs = []
         self.data = tf.placeholder(tf.float32, shape=[None, None, None, 3])
         self.im_info = tf.placeholder(tf.float32, shape=[None, 3])
+        # gt_boxes
+        # return {'boxes': boxes,
+        #         'gt_classes': gt_classes,
+        #         'gt_overlaps': overlaps,
+        #         'flipped': False,
+        #         'seg_areas': seg_areas}
+        # 所以shape=[None, 5]
         self.gt_boxes = tf.placeholder(tf.float32, shape=[None, 5])
         self.keep_prob = tf.placeholder(tf.float32)
         self.layers = dict({'data':self.data, 'im_info':self.im_info, 'gt_boxes':self.gt_boxes})
@@ -31,6 +39,7 @@ class VGGnet_train(Network):
             self.bbox_bias_assign = biases.assign(self.bbox_biases)
 
     def setup(self):
+        # 在论文中，为了节省内存，对VGG网络从conv3_1开始训练
         (self.feed('data')
              .conv(3, 3, 64, 1, 1, name='conv1_1', trainable=False)
              .conv(3, 3, 64, 1, 1, name='conv1_2', trainable=False)
@@ -48,10 +57,12 @@ class VGGnet_train(Network):
              .max_pool(2, 2, 2, 2, padding='VALID', name='pool4')
              .conv(3, 3, 512, 1, 1, name='conv5_1')
              .conv(3, 3, 512, 1, 1, name='conv5_2')
-             .conv(3, 3, 512, 1, 1, name='conv5_3'))
+             .conv(3, 3, 512, 1, 1, name='conv5_3'))   # 感受野为196*196
         #========= RPN ============
+
+        # rpn_conv/3x3为3*3大小的滑动窗口层
         (self.feed('conv5_3')
-             .conv(3,3,512,1,1,name='rpn_conv/3x3')
+             .conv(3,3,512,1,1,name='rpn_conv/3x3') # len(anchor_scales)*3*2   anchor尺度数量*anchor的长宽比例*预测的分类数量
              .conv(1,1,len(anchor_scales)*3*2 ,1 , 1, padding='VALID', relu = False, name='rpn_cls_score'))
 
         (self.feed('rpn_cls_score','gt_boxes','im_info','data')
@@ -59,7 +70,7 @@ class VGGnet_train(Network):
 
         # Loss of rpn_cls & rpn_boxes
 
-        (self.feed('rpn_conv/3x3')
+        (self.feed('rpn_conv/3x3') # len(anchor_scales)*3*2   anchor尺度数量*anchor的长宽比例*anchor的四个顶点的偏移量
              .conv(1,1,len(anchor_scales)*3*4, 1, 1, padding='VALID', relu = False, name='rpn_bbox_pred'))
 
         #========= RoI Proposal ============

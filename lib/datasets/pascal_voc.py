@@ -204,6 +204,7 @@ class pascal_voc(imdb):
     #         'gt_overlaps': overlaps,
     #         'flipped': False,
     #         'seg_areas': seg_areas}
+    # 其中flipped判断该图像是否被翻转
     def _load_pascal_annotation(self, index):
         """
         Load image and bounding boxes info from XML file in the PASCAL VOC

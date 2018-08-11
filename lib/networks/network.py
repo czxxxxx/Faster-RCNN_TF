@@ -192,7 +192,7 @@ class Network(object):
             input[0] = input[0][0]
 
         with tf.variable_scope(name) as scope:
-
+            # Wraps a python function and uses it as a TensorFlow op
             rpn_labels,rpn_bbox_targets,rpn_bbox_inside_weights,rpn_bbox_outside_weights = tf.py_func(anchor_target_layer_py,[input[0],input[1],input[2],input[3], _feat_stride, anchor_scales],[tf.float32,tf.float32,tf.float32,tf.float32])
 
             rpn_labels = tf.convert_to_tensor(tf.cast(rpn_labels,tf.int32), name = 'rpn_labels')
