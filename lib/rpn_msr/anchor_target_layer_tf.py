@@ -173,26 +173,42 @@ def anchor_target_layer(rpn_cls_score, gt_boxes, im_info, data, _feat_stride = [
 
     # overlaps between the anchors and the gt boxes
     # overlaps (ex, gt)
+    # 返回[N,K]矩阵，记录每一个anchors和gt框的IoU。N为anchors数量，K为gt框数量。
     overlaps = bbox_overlaps(
         np.ascontiguousarray(anchors, dtype=np.float),
         np.ascontiguousarray(gt_boxes, dtype=np.float))
+    # 记录每个anchor对应的最大IoU的index（0到K-1），为每一个anchor找到与其重叠最好的GT
     argmax_overlaps = overlaps.argmax(axis=1)
+    # 记录每个anchor对应的最大IoU的值
     max_overlaps = overlaps[np.arange(len(inds_inside)), argmax_overlaps]
+    # 记录和gt框IoU最高的anchors的index，为每一个GT找到与其重叠最好的一个anchor。当有多个anchor与GT框的IoU同时取到最大值时，只返回第一个的anchor的index
     gt_argmax_overlaps = overlaps.argmax(axis=0)
+    # 记录和每一个gt框有最大IoU值的anchors的IoU
     gt_max_overlaps = overlaps[gt_argmax_overlaps,
                                np.arange(overlaps.shape[1])]
+    # np.where返回的是一个tuple，tuple里元素为array。在这个情况中，tuple里存着两个array，第一个array指明axis=0时的index，第二个array指明axis=1时的index。故用[0]取array，表明anchor的index
+    # 上面所求的gt_argmax_overlaps只能指定第一个有最大IoU的anchor位置，当有多个anchor的IoU同时取到最大值时，是不能同时取到这几个anchors的。
+    # 通过以下这个方法，获取到全部这些anchors。
     gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
 
+
+    # PRN网络微调训练
+    # 正样本：与Ground Truth相交IoU最大的anchors【以防后一种方式下没有正样本】+与Ground Truth相交IoU>0.7的anchors
+    # 负样本：与Ground Truth相交IoU<0.3的anchors
     if not cfg.TRAIN.RPN_CLOBBER_POSITIVES:
         # assign bg labels first so that positive labels can clobber them
+        # labels与max_overlaps都是[(len(inds_inside), 1]形状的，下一行代码表示将最大IoU小于TRAIN.RPN_NEGATIVE_OVERLAP的对应的anchors的labels设置为0
         labels[max_overlaps < cfg.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
 
     # fg label: for each gt, anchor with highest overlap
+    # 为了防止出现空的正样本，将与Ground Truth相交IoU最大的anchors设置为正样本
     labels[gt_argmax_overlaps] = 1
 
     # fg label: above threshold IOU
+    # 与Ground Truth相交IoU>TRAIN.RPN_POSITIVE_OVERLAP的anchors
     labels[max_overlaps >= cfg.TRAIN.RPN_POSITIVE_OVERLAP] = 1
 
+    # 这个参数就是看positive与negative谁比较强，先设置0说明positive强，因为0可能转1,而后设置0说明negative强，设置完1还可以设置成0
     if cfg.TRAIN.RPN_CLOBBER_POSITIVES:
         # assign bg labels last so that negative labels can clobber positives
         labels[max_overlaps < cfg.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
