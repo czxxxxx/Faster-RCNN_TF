@@ -226,9 +226,19 @@ class Network(object):
     def reshape_layer(self, input, d,name):
         input_shape = tf.shape(input)
         if name == 'rpn_cls_prob_reshape':
+             # 此时d=18，input_shape为[1,height*18/2,width,2]
+             # tf.transpose(input,[0,3,1,2])的shape为[1,2,height*18/2,width]
+             # 将上面的结果reshape为[1,18,height,width]
+             # 转置为[1,height,width,18]
              return tf.transpose(tf.reshape(tf.transpose(input,[0,3,1,2]),[input_shape[0],
                     int(d),tf.cast(tf.cast(input_shape[1],tf.float32)/tf.cast(d,tf.float32)*tf.cast(input_shape[3],tf.float32),tf.int32),input_shape[2]]),[0,2,3,1],name=name)
         else:
+             # tf.transpose(input,[0,3,1,2])的shape为[1,depth,height,width]，例如rpn_cls_score时为18
+
+             # tf.reshape(tf.transpose(input,[0,3,1,2]),[input_shape[0],int(d),tf.cast(tf.cast(input_shape[1],tf.float32)*(tf.cast(input_shape[3],tf.float32)/tf.cast(d,tf.float32)),tf.int32)
+             # 的结果的shape为[1,d,height*depth/d,width],例如rpn_cls_score时，d=2，就是anchor的cls种类，那么depth/d=9就相当于anchors数量
+
+             # 将结果转置，axis为[0,2,3,1]，结果shape为[1,height*depth/d,width,d]，把结果返回
              return tf.transpose(tf.reshape(tf.transpose(input,[0,3,1,2]),[input_shape[0],
                     int(d),tf.cast(tf.cast(input_shape[1],tf.float32)*(tf.cast(input_shape[3],tf.float32)/tf.cast(d,tf.float32)),tf.int32),input_shape[2]]),[0,2,3,1],name=name)
 

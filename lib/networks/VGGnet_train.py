@@ -61,10 +61,12 @@ class VGGnet_train(Network):
         #========= RPN ============
 
         # rpn_conv/3x3为3*3大小的滑动窗口层
+        # rpn_cls_score的shape为[1,height,width,depth(18)]
         (self.feed('conv5_3')
              .conv(3,3,512,1,1,name='rpn_conv/3x3') # len(anchor_scales)*3*2   anchor尺度数量*anchor的长宽比例*预测的分类数量
              .conv(1,1,len(anchor_scales)*3*2 ,1 , 1, padding='VALID', relu = False, name='rpn_cls_score'))
 
+        # 获取anchors的cls和reg信息用于训练，即生成样本
         (self.feed('rpn_cls_score','gt_boxes','im_info','data')
              .anchor_target_layer(_feat_stride, anchor_scales, name = 'rpn-data' ))
 
@@ -74,13 +76,19 @@ class VGGnet_train(Network):
              .conv(1,1,len(anchor_scales)*3*4, 1, 1, padding='VALID', relu = False, name='rpn_bbox_pred'))
 
         #========= RoI Proposal ============
+
+        # 以下两个feed过程是为了实现同一个anchor的两个分类的softmax过程
+
+        # shape为[1,height*9,width,2]
         (self.feed('rpn_cls_score')
              .reshape_layer(2,name = 'rpn_cls_score_reshape')
              .softmax(name='rpn_cls_prob'))
 
+        # shape为[1,height,width,18]
         (self.feed('rpn_cls_prob')
              .reshape_layer(len(anchor_scales)*3*2,name = 'rpn_cls_prob_reshape'))
 
+        # [post_nms_topN, 4],建议框在输入图片上的x1，y1，x2，y2
         (self.feed('rpn_cls_prob_reshape','rpn_bbox_pred','im_info')
              .proposal_layer(_feat_stride, anchor_scales, 'TRAIN',name = 'rpn_rois'))
 

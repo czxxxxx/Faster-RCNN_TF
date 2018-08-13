@@ -31,7 +31,7 @@ def bbox_overlaps(
     cdef DTYPE_t ua
     cdef unsigned int k, n
 
-    # 计算ss建议框和ground truth box的IoU
+    # 计算建议框和ground truth box的IoU
     for k in range(K):
         #gt框的面积大小为box_area
         box_area = (

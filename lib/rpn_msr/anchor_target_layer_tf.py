@@ -214,9 +214,16 @@ def anchor_target_layer(rpn_cls_score, gt_boxes, im_info, data, _feat_stride = [
         labels[max_overlaps < cfg.TRAIN.RPN_NEGATIVE_OVERLAP] = 0
 
     # subsample positive labels if we have too many
+    # SGD mini - batch采样方式：
+    # 同Fast R - CNN网络，采取”image - centric”方式采样，即采用层次采样，先对图像取样，再对anchors取样，同一图像的anchors共享计算和内存。
+    # 每个mini-batch包含从一张图中随机提取的256个anchors，正负样本比例为1: 1【当然可以对一张图所有anchors进行优化，但由于负样本过多最终模型会对正样本预测准确率很低】
+    # 来计算一个mini-batch的损失函数，如果一张图中不够128个正样本，拿负样本凑齐。
+    # 这里默认下，TRAIN.RPN_FG_FRACTION为0.5，表示正样本占据TRAIN.RPN_BATCHSIZE的一半，即正负样本比例为1:1
     num_fg = int(cfg.TRAIN.RPN_FG_FRACTION * cfg.TRAIN.RPN_BATCHSIZE)
     fg_inds = np.where(labels == 1)[0]
     if len(fg_inds) > num_fg:
+        # choice : Generates a random sample from a given 1-D array
+        # 从正样本中随机选出多余的部分，将他们的labels设置为-1（不关心）
         disable_inds = npr.choice(
             fg_inds, size=(len(fg_inds) - num_fg), replace=False)
         labels[disable_inds] = -1
@@ -232,6 +239,11 @@ def anchor_target_layer(rpn_cls_score, gt_boxes, im_info, data, _feat_stride = [
             #len(bg_inds), len(disable_inds), np.sum(labels == 0))
 
     bbox_targets = np.zeros((len(inds_inside), 4), dtype=np.float32)
+
+    # anchors ： 不超出边界的anchors
+    # argmax_overlaps：为每一个anchor找到与其IoU最大的gt，其shape为[1，len(anchors)]
+    # gt_boxes[argmax_overlaps, :]的shape为[len(anchors),5]
+    # 返回每一个anchor的(targets_dx, targets_dy, targets_dw, targets_dh)
     bbox_targets = _compute_targets(anchors, gt_boxes[argmax_overlaps, :])
 
     bbox_inside_weights = np.zeros((len(inds_inside), 4), dtype=np.float32)
@@ -265,7 +277,9 @@ def anchor_target_layer(rpn_cls_score, gt_boxes, im_info, data, _feat_stride = [
         print stds
 
     # map up to original set of anchors
+    # 之后可能还会用到超出图片边界的anchors的信息，所以对labels信息进行扩充，添加进去了第一次筛选出的anchor的标签（都为-1）
     labels = _unmap(labels, total_anchors, inds_inside, fill=-1)
+    # 对bbox_targets信息进行扩充，将超出图片边界的anchors的reg信息添加进来，但是都设置为0
     bbox_targets = _unmap(bbox_targets, total_anchors, inds_inside, fill=0)
     bbox_inside_weights = _unmap(bbox_inside_weights, total_anchors, inds_inside, fill=0)
     bbox_outside_weights = _unmap(bbox_outside_weights, total_anchors, inds_inside, fill=0)
@@ -282,6 +296,11 @@ def anchor_target_layer(rpn_cls_score, gt_boxes, im_info, data, _feat_stride = [
 
     # labels
     #pdb.set_trace()
+    # height和weight为特征图里的相应位置
+    # 由之前anchor产生可知，anchor产生的排序方式与卷积的顺序相同，一行一行的出，每个位置产生9个anchor
+    # NOTE：由于越往后信息归类越精确，所以labels.reshape((1, height, width, A))顺序正常的
+    # 之后transpose(0, 3, 1, 2)，此时最精确信息为width，此时以width信息进行fastest聚类
+    # [1,A,height,weight]
     labels = labels.reshape((1, height, width, A)).transpose(0, 3, 1, 2)
     labels = labels.reshape((1, 1, A * height, width))
     rpn_labels = labels
@@ -291,6 +310,7 @@ def anchor_target_layer(rpn_cls_score, gt_boxes, im_info, data, _feat_stride = [
         .reshape((1, height, width, A * 4)).transpose(0, 3, 1, 2)
 
     rpn_bbox_targets = bbox_targets
+
     # bbox_inside_weights
     bbox_inside_weights = bbox_inside_weights \
         .reshape((1, height, width, A * 4)).transpose(0, 3, 1, 2)
@@ -315,10 +335,15 @@ def _unmap(data, count, inds, fill=0):
     """ Unmap a subset of item (data) back to the original set of items (of
     size count) """
     if len(data.shape) == 1:
+        #图片内的anchor属于第一次筛选，筛选出去的label都为-1
+        #第一次筛选后的anchor，其中符合条件的anchor分别被赋予0与1，其余的都为-1
+        #第二次筛选：可能标签为1与0的太多了，随机排除一些，标签设置为-1
+        #所以inds_inside与labels一一对应，但是其中还存在有大量不训练的标签为-1的anchor
         ret = np.empty((count, ), dtype=np.float32)
         ret.fill(fill)
         ret[inds] = data
     else:
+        # 如果data为多维的，则生成一个与data形状相同的array，但是shape[0]变为了count
         ret = np.empty((count, ) + data.shape[1:], dtype=np.float32)
         ret.fill(fill)
         ret[inds, :] = data
@@ -331,5 +356,5 @@ def _compute_targets(ex_rois, gt_rois):
     assert ex_rois.shape[0] == gt_rois.shape[0]
     assert ex_rois.shape[1] == 4
     assert gt_rois.shape[1] == 5
-
+    # gt_rois的shape[1]为5，通过[:, :4]取前四列
     return bbox_transform(ex_rois, gt_rois[:, :4]).astype(np.float32, copy=False)
