@@ -15,6 +15,8 @@ import pdb
 
 DEBUG = False
 
+
+# rpn_rois ：[post_nms_topN, 5]，包含[0,x1，y1，x2，y2]
 def proposal_target_layer(rpn_rois, gt_boxes,_num_classes):
     """
     Assign object detection proposals to ground-truth targets. Produces proposal
@@ -114,9 +116,13 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
     overlaps = bbox_overlaps(
         np.ascontiguousarray(all_rois[:, 1:5], dtype=np.float),
         np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
+
+    # 为每一个框找到IoU最大的gt框，并且记录下该建议框所属的种类(一共21个种类)
     gt_assignment = overlaps.argmax(axis=1)
     max_overlaps = overlaps.max(axis=1)
     labels = gt_boxes[gt_assignment, 4]
+
+    # 找到bg与fg的建议框
 
     # Select foreground RoIs as those with >= FG_THRESH overlap
     fg_inds = np.where(max_overlaps >= cfg.TRAIN.FG_THRESH)[0]
@@ -141,6 +147,7 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
     # The indices that we're selecting (both fg and bg)
     keep_inds = np.append(fg_inds, bg_inds)
     # Select sampled values from various arrays:
+    # 在找到bg和fg建议框后更新labels
     labels = labels[keep_inds]
     # Clamp labels for the background RoIs to 0
     labels[fg_rois_per_this_image:] = 0

@@ -161,7 +161,7 @@ def proposal_layer(rpn_cls_prob_reshape,rpn_bbox_pred,im_info,cfg_key,_feat_stri
     batch_inds = np.zeros((proposals.shape[0], 1), dtype=np.float32)
     blob = np.hstack((batch_inds, proposals.astype(np.float32, copy=False)))
 
-    # blob的形状为[post_nms_topN,4],保存着x1，y1，x2，y2信息。
+    # blob的形状为[post_nms_topN,5],保存着[0,x1，y1，x2，y2]信息。
     return blob
     #top[0].reshape(*(blob.shape))
     #top[0].data[...] = blob

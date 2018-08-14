@@ -67,12 +67,13 @@ class VGGnet_train(Network):
              .conv(1,1,len(anchor_scales)*3*2 ,1 , 1, padding='VALID', relu = False, name='rpn_cls_score'))
 
         # 获取anchors的cls和reg信息用于训练，即生成样本
+        # 用于RPN网络微调训练
         (self.feed('rpn_cls_score','gt_boxes','im_info','data')
              .anchor_target_layer(_feat_stride, anchor_scales, name = 'rpn-data' ))
 
         # Loss of rpn_cls & rpn_boxes
 
-        (self.feed('rpn_conv/3x3') # len(anchor_scales)*3*2   anchor尺度数量*anchor的长宽比例*anchor的四个顶点的偏移量
+        (self.feed('rpn_conv/3x3') # len(anchor_scales)*3*2   anchor尺度数量*anchor的长宽比例*anchor的四个顶点
              .conv(1,1,len(anchor_scales)*3*4, 1, 1, padding='VALID', relu = False, name='rpn_bbox_pred'))
 
         #========= RoI Proposal ============
@@ -88,10 +89,12 @@ class VGGnet_train(Network):
         (self.feed('rpn_cls_prob')
              .reshape_layer(len(anchor_scales)*3*2,name = 'rpn_cls_prob_reshape'))
 
-        # [post_nms_topN, 4],建议框在输入图片上的x1，y1，x2，y2
+        # [post_nms_topN, 5],建议框在输入图片上的[0,x1，y1，x2，y2],0是batch index，这里都是为0
         (self.feed('rpn_cls_prob_reshape','rpn_bbox_pred','im_info')
              .proposal_layer(_feat_stride, anchor_scales, 'TRAIN',name = 'rpn_rois'))
 
+        # 生成RoI样本信息，用于Fast R-CNN网络的微调训练
+        # TODO：不同的cls有不同的回归信息？
         (self.feed('rpn_rois','gt_boxes')
              .proposal_target_layer(n_classes,name = 'roi-data'))
 
