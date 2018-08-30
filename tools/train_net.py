@@ -85,6 +85,8 @@ if __name__ == '__main__':
 
     imdb = get_imdb(args.imdb_name)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
+
+    # 这里获取的roi是gt框，gt框在net的rpn-data层和roi-data层中会生成用于rpn和fast rcnn的微调的样本
     roidb = get_training_roidb(imdb)
 
     output_dir = get_output_dir(imdb, None)

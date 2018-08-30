@@ -15,12 +15,15 @@ from utils.blob import prep_im_for_blob, im_list_to_blob
 
 def get_minibatch(roidb, num_classes):
     """Given a roidb, construct a minibatch sampled from it."""
+
+    # 默认为2
     num_images = len(roidb)
     assert(cfg.TRAIN.BATCH_SIZE % num_images == 0), \
         'num_images ({}) must divide BATCH_SIZE ({})'. \
         format(num_images, cfg.TRAIN.BATCH_SIZE)
 
     # Get the input image blob, formatted for caffe
+    # 获取图像数组
     im_blob = _get_image_blob(roidb)
 
     # build the box information blob

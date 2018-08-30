@@ -26,6 +26,7 @@ class SolverWrapper(object):
     use to unnormalize the learned bounding-box regression weights.
     """
 
+    # roidb是过滤后的gt框
     def __init__(self, sess, saver, network, imdb, roidb, output_dir, pretrained_model=None):
         """Initialize the SolverWrapper."""
         self.net = network
@@ -111,7 +112,14 @@ class SolverWrapper(object):
         rpn_cls_score = tf.reshape(self.net.get_output('rpn_cls_score_reshape'),[-1,2])
         rpn_label = tf.reshape(self.net.get_output('rpn-data')[0],[-1])
         rpn_cls_score = tf.reshape(tf.gather(rpn_cls_score,tf.where(tf.not_equal(rpn_label,-1))),[-1,2])
+
+        # gather：根据索引从参数轴上收集切片。
+        # 即收集到not_equal(rpn_label,-1)——（label！=-1）的切片label==-1表示该anchor我们不关心
+        # 结果即为有效的信息
+        # rpn_label表示的是anchor的实际值，rpn_cls_score代表的是预测值
         rpn_label = tf.reshape(tf.gather(rpn_label,tf.where(tf.not_equal(rpn_label,-1))),[-1])
+
+        # 背景与前景的交叉熵
         rpn_cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=rpn_cls_score, labels=rpn_label))
 
         # bounding box regression L1 loss
@@ -257,6 +265,8 @@ def filter_roidb(roidb):
 
 def train_net(network, imdb, roidb, output_dir, pretrained_model=None, max_iters=40000):
     """Train a Fast R-CNN network."""
+
+    #过滤roi，找到有效的roi信息
     roidb = filter_roidb(roidb)
     saver = tf.train.Saver(max_to_keep=100)
     with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:

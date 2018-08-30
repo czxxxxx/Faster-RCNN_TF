@@ -25,6 +25,8 @@ class RoIDataLayer(object):
 
     def _shuffle_roidb_inds(self):
         """Randomly permute the training roidb."""
+        # 将所有的roi都进行Randomly permute随机排序，即改变输入image的顺序
+        # perm存储随机排序后的image的index
         self._perm = np.random.permutation(np.arange(len(self._roidb)))
         self._cur = 0
 
@@ -32,6 +34,7 @@ class RoIDataLayer(object):
         """Return the roidb indices for the next minibatch."""
         
         if cfg.TRAIN.HAS_RPN:
+            # 默认情况下，IMS_PER_BATCH为2
             if self._cur + cfg.TRAIN.IMS_PER_BATCH >= len(self._roidb):
                 self._shuffle_roidb_inds()
 
@@ -43,6 +46,8 @@ class RoIDataLayer(object):
             i = 0
             while (i < cfg.TRAIN.IMS_PER_BATCH):
                 ind = self._perm[self._cur]
+
+                # gt框的个数
                 num_objs = self._roidb[ind]['boxes'].shape[0]
                 if num_objs != 0:
                     db_inds[i] = ind

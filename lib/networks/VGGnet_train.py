@@ -94,7 +94,7 @@ class VGGnet_train(Network):
              .proposal_layer(_feat_stride, anchor_scales, 'TRAIN',name = 'rpn_rois'))
 
         # 生成RoI样本信息，用于Fast R-CNN网络的微调训练
-        # TODO：不同的cls有不同的回归信息？
+        # 不同的cls有不同的回归信息
         (self.feed('rpn_rois','gt_boxes')
              .proposal_target_layer(n_classes,name = 'roi-data'))
 

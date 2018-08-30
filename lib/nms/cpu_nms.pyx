@@ -24,6 +24,7 @@ def cpu_nms(np.ndarray[np.float32_t, ndim=2] dets, np.float thresh):
     cdef np.ndarray[np.float32_t, ndim=1] areas = (x2 - x1 + 1) * (y2 - y1 + 1)
     cdef np.ndarray[np.int_t, ndim=1] order = scores.argsort()[::-1]
 
+    # 框的数量
     cdef int ndets = dets.shape[0]
     cdef np.ndarray[np.int_t, ndim=1] suppressed = \
             np.zeros((ndets), dtype=np.int)
@@ -40,10 +41,17 @@ def cpu_nms(np.ndarray[np.float32_t, ndim=2] dets, np.float thresh):
     cdef np.float32_t inter, ovr
 
     keep = []
+    # order保存的是框的score从大到小排序下来的index的顺序
+    # kepp表示保存下来的框的index
+    # suppressed表示被一直的框的index
     for _i in range(ndets):
         i = order[_i]
+
+        # 如果第i个框已经被抑制，直接跳过该次loop进行下一次loop
         if suppressed[i] == 1:
             continue
+
+        # 该框没有被抑制，且是之后所有框中score最高的框，肯定是kepp的框
         keep.append(i)
         ix1 = x1[i]
         iy1 = y1[i]
@@ -51,6 +59,9 @@ def cpu_nms(np.ndarray[np.float32_t, ndim=2] dets, np.float thresh):
         iy2 = y2[i]
         iarea = areas[i]
         for _j in range(_i + 1, ndets):
+
+            # 将较低score的框（即后面的框）与第i个框进行IoU计算
+
             j = order[_j]
             if suppressed[j] == 1:
                 continue
@@ -62,6 +73,7 @@ def cpu_nms(np.ndarray[np.float32_t, ndim=2] dets, np.float thresh):
             h = max(0.0, yy2 - yy1 + 1)
             inter = w * h
             ovr = inter / (iarea + areas[j] - inter)
+            # IoU大于阈值时，对score较低的框进行抑制
             if ovr >= thresh:
                 suppressed[j] = 1
 
